@@ -1,4 +1,4 @@
 brainflow
 PySide6
 pyqtgraph
-sklearn
+scikit-learn
