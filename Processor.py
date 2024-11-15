@@ -35,9 +35,7 @@ class Processor(Board):
     def filter(self, new_raw):
         '''
         raw -> filtered
-        TODO: add incremental version / FIR version?
         '''
-        # https://ieeexplore.ieee.org/document/8949764
         n = new_raw.shape[1]  # Number of new samples
         # new_filtered = new_raw.copy()  # Copy the data to avoid modifying the original
         new_filtered = self.raw_signal.copy()  # include the entire buffer to avoid boundary effects
