@@ -1,1 +1,4 @@
 brainflow
+PySide6
+pyqtgraph
+sklearn
