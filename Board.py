@@ -57,9 +57,11 @@ class Board:
         self.board.insert_marker(id)
 
 def main():
+    params = BrainFlowInputParams()
+    params.serial_port = '/dev/cu.usbmodem11'
     board = Board(
-        config.BOARD_ID, 
-        config.BRAINFLOW_INPUT_PARAMS
+        BoardIds.SYNTHETIC_BOARD, 
+        params=params
     )
     
     try:
@@ -68,8 +70,7 @@ def main():
         # Collect data every 2 seconds
         while True:
             time.sleep(2)
-            print(board.board.get_marker_channel(BoardIds.MUSE_2016_BOARD))
-            board.board.insert_marker(69420)
+            print(board.board.get_board_data())
     except KeyboardInterrupt:
         # Stop session on interrupt
         print("\nStopping session...")
