@@ -1,8 +1,11 @@
 import sys
-import socket
+import time
 import json
 import csv
-import numpy as np  # Required for image handling with pyqtgraph
+import socket
+from datetime import datetime
+from collections import deque
+
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget,
     QTextEdit, QLabel, QHBoxLayout, QLineEdit, QMessageBox, QFormLayout,
@@ -10,74 +13,156 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QThread, Signal, Slot, QObject, QTimer, Qt
 import pyqtgraph as pg
-from collections import deque
-import random
-import time
 
-class ReceiverThread(QThread):
-    data_received = Signal(dict)
-    connection_status = Signal(str)
+from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
+from brainflow import DataFilter
 
-    def __init__(self, host='localhost', port=12345):
+# Define the DataAcquisitionThread to handle BrainFlow data
+class DataAcquisitionThread(QThread):
+    eeg_data_signal = Signal(list)  # Emit EEG data list
+
+    def __init__(self, board_id=BoardIds.SYNTHETIC_BOARD, params=None):
         super().__init__()
-        self.host = host
-        self.port = port
+        self.board_id = board_id
+        self.params = params if params else BrainFlowInputParams()
+        self.board = None
         self.is_running = True
-        self.sock = None
 
     def run(self):
         try:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.connect((self.host, self.port))
-            self.connection_status.emit(f"Connected to {self.host}:{self.port}")
-            print(f"[ReceiverThread] Connected to {self.host}:{self.port}")
-        except ConnectionRefusedError:
-            self.connection_status.emit("Failed to connect to the server.")
-            print("[ReceiverThread] Failed to connect to the server.")
-            return
+            # Initialize the board
+            self.board = BoardShim(self.board_id, self.params)
+            self.board.prepare_session()
+            self.board.start_stream()
+            print("[DataAcquisitionThread] Board session started.")
 
-        buffer = ""
-        while self.is_running:
-            try:
-                data = self.sock.recv(1024).decode('utf-8')
-                if not data:
-                    self.connection_status.emit("Server disconnected.")
-                    print("[ReceiverThread] Server disconnected.")
-                    break
-                buffer += data
-                while '\n' in buffer:
-                    message, buffer = buffer.split('\n', 1)
-                    try:
-                        json_data = json.loads(message)
-                        self.data_received.emit(json_data)
-                        print(f"[ReceiverThread] Data received: {json_data}")
-                    except json.JSONDecodeError:
-                        print("Received malformed JSON data.")
-            except ConnectionResetError:
-                self.connection_status.emit("Connection lost.")
-                print("[ReceiverThread] Connection lost.")
-                break
+            while self.is_running:
+                # Get data from the board
+                data = self.board.get_board_data()
+                if data.size > 0:
+                    # Assuming the first row contains the latest data for channel 1
+                    # Adjust indexing based on your specific board and channel setup
+                    latest_eeg = data[:, :8].tolist()  # Get first 8 channels
+                    latest_eeg = [row[-1] for row in latest_eeg]  # Latest sample for each channel
+                    self.eeg_data_signal.emit(latest_eeg)
+                time.sleep(0.5)  # Adjust the sleep time as needed
+
+        except Exception as e:
+            print(f"[DataAcquisitionThread] Exception: {e}")
+            QMessageBox.critical(None, "Board Connection Error", f"An error occurred: {e}")
+            self.is_running = False
 
     def stop(self):
-        print("[ReceiverThread] Stopping thread.")
         self.is_running = False
-        if self.sock:
-            self.sock.close()
+        if self.board and self.board.is_prepared():
+            self.board.stop_stream()
+            self.board.release_session()
+            print("[DataAcquisitionThread] Board session released.")
         self.quit()
         self.wait()
 
-class SignalHandler(QObject):
-    data_received = Signal(dict)
-    connection_status = Signal(str)
+# Define the MazeDataReceiverThread to handle incoming maze data
+class MazeDataReceiverThread(QThread):
+    maze_data_signal = Signal(dict)  # Emit maze data as a dictionary
 
+    def __init__(self, host='localhost', port=65432):
+        super().__init__()
+        self.host = host
+        self.port = port
+        self.server_socket = None
+        self.client_socket = None
+        self.is_running = True
+
+    def run(self):
+        try:
+            # Set up the server socket
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.bind((self.host, self.port))
+            self.server_socket.listen(1)
+            self.server_socket.settimeout(1.0)  # Timeout for accepting connections
+            print(f"[MazeDataReceiverThread] Server listening on {self.host}:{self.port}")
+
+            while self.is_running:
+                try:
+                    self.client_socket, addr = self.server_socket.accept()
+                    print(f"[MazeDataReceiverThread] Connected by {addr}")
+                    self.client_socket.settimeout(1.0)
+                except socket.timeout:
+                    continue  # Check if still running
+                except OSError as e:
+                    if not self.is_running:
+                        break  # Socket was closed, exit the loop
+                    else:
+                        print(f"[MazeDataReceiverThread] OSError during accept: {e}")
+                        continue
+
+                while self.is_running:
+                    try:
+                        data = self.client_socket.recv(1024).decode('utf-8')
+                        if not data:
+                            print("[MazeDataReceiverThread] Client disconnected.")
+                            break
+                        messages = data.strip().split('\n')
+                        for message in messages:
+                            try:
+                                json_data = json.loads(message)
+                                self.maze_data_signal.emit(json_data)
+                                print(f"[MazeDataReceiverThread] Received data: {json_data}")
+                            except json.JSONDecodeError:
+                                print("[MazeDataReceiverThread] Received malformed JSON.")
+                    except socket.timeout:
+                        continue  # Check if still running
+                    except ConnectionResetError:
+                        print("[MazeDataReceiverThread] Connection reset by peer.")
+                        break
+                    except OSError as e:
+                        if not self.is_running:
+                            break  # Socket was closed, exit the loop
+                        else:
+                            print(f"[MazeDataReceiverThread] OSError during recv: {e}")
+                            break
+
+                # Close client socket after disconnection
+                if self.client_socket:
+                    try:
+                        self.client_socket.close()
+                    except Exception as e:
+                        print(f"[MazeDataReceiverThread] Exception while closing client socket: {e}")
+                    self.client_socket = None
+
+        except Exception as e:
+            print(f"[MazeDataReceiverThread] Exception: {e}")
+            QMessageBox.critical(None, "Maze Connection Error", f"An error occurred: {e}")
+            self.is_running = False
+
+    def stop(self):
+        print("[MazeDataReceiverThread] Stopping thread.")
+        self.is_running = False
+        # Close client socket first to unblock recv
+        if self.client_socket:
+            try:
+                self.client_socket.shutdown(socket.SHUT_RDWR)
+                self.client_socket.close()
+            except Exception as e:
+                print(f"[MazeDataReceiverThread] Exception during client socket shutdown: {e}")
+        # Close server socket
+        if self.server_socket:
+            try:
+                self.server_socket.close()
+            except Exception as e:
+                print(f"[MazeDataReceiverThread] Exception during server socket close: {e}")
+        self.quit()
+        self.wait()
+        print("[MazeDataReceiverThread] Thread stopped.")
+# Define the main ClientWindow
 class ClientWindow(QMainWindow):
-    def __init__(self, server_ip='localhost', server_port=12345):
+    def __init__(self, board_id=BoardIds.SYNTHETIC_BOARD, params=None, maze_host='localhost', maze_port=65432):
         super().__init__()
         print("[ClientWindow] Initializing ClientWindow.")
         self.setWindowTitle("NeuroNavScore Client Application")
-        self.setGeometry(100, 100, 800, 600)  # Reduced size for simplicity
+        self.setGeometry(100, 100, 1200, 800)  # Adjusted size for better visualization
 
-        # Initialize Test Control Variables BEFORE init_ui()
+        # Initialize Test Control Variables
         self.test_running = False
         self.test_paused = False
         self.test_start_time = None
@@ -86,16 +171,21 @@ class ClientWindow(QMainWindow):
         self.pass_fail_result = None
         self.score = 0
 
-        # Initialize Signal Handler
-        self.signal_handler = SignalHandler()
-        self.signal_handler.data_received.connect(self.process_data)
-        self.signal_handler.connection_status.connect(self.update_status)
+        # Initialize Data Structures
+        self.eeg_channels = 4
+        self.eeg_data = [deque(maxlen=100) for _ in range(self.eeg_channels)]
+        self.maze_events = []  # Store maze events for potential future use
 
-        # Initialize UI and Socket AFTER setting test variables
+        # Initialize UI
         self.init_ui()
-        self.init_socket(server_ip, server_port)
 
-        # Timer for Test Monitoring
+        # Initialize Data Acquisition Thread
+        self.init_data_acquisition(board_id, params)
+
+        # Initialize Maze Data Receiver Thread
+        self.init_maze_data_receiver(maze_host, maze_port)
+
+        # Initialize Timer for Test Monitoring
         self.test_timer = QTimer()
         self.test_timer.timeout.connect(self.monitor_test)
 
@@ -106,7 +196,7 @@ class ClientWindow(QMainWindow):
 
         # Title Label
         title_label = QLabel("NeuroNavScore")
-        title_label.setStyleSheet("font-size: 32px; font-weight: bold;")
+        title_label.setStyleSheet("font-size: 36px; font-weight: bold;")
         title_label.setAlignment(Qt.AlignCenter)
 
         # Patient Information Group
@@ -135,7 +225,6 @@ class ClientWindow(QMainWindow):
         self.eeg_graph.showGrid(x=True, y=True)
         self.eeg_graph.addLegend()
 
-        self.eeg_channels = 8
         self.curves = []
         self.colors = ['r', 'g', 'b', 'c', 'm', 'y', 'w', 'k']
 
@@ -161,21 +250,25 @@ class ClientWindow(QMainWindow):
         self.start_test_button = QPushButton("Start Test")
         self.start_test_button.setStyleSheet("font-size: 14px; padding: 8px;")
         self.start_test_button.clicked.connect(self.start_test)
+        self.start_test_button.setToolTip("Click to start the navigation test.")
 
         self.pause_test_button = QPushButton("Pause Test")
         self.pause_test_button.setStyleSheet("font-size: 14px; padding: 8px;")
         self.pause_test_button.clicked.connect(self.pause_test)
         self.pause_test_button.setEnabled(False)
+        self.pause_test_button.setToolTip("Click to pause or resume the test.")
 
         self.stop_test_button = QPushButton("Stop Test")
         self.stop_test_button.setStyleSheet("font-size: 14px; padding: 8px;")
         self.stop_test_button.clicked.connect(self.stop_test)
         self.stop_test_button.setEnabled(False)
+        self.stop_test_button.setToolTip("Click to stop the test prematurely.")
 
         self.reset_test_button = QPushButton("Reset Test")
         self.reset_test_button.setStyleSheet("font-size: 14px; padding: 8px;")
         self.reset_test_button.clicked.connect(self.reset_test)
         self.reset_test_button.setEnabled(False)
+        self.reset_test_button.setToolTip("Click to reset all test data.")
 
         controls_layout.addWidget(self.duration_label)
         controls_layout.addWidget(self.duration_input)
@@ -189,15 +282,15 @@ class ClientWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setMaximum(self.test_duration)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("Test Progress: %p%")
+        self.progress_bar.setFormat(f"Test Progress: 0/{self.test_duration}/s")
         self.progress_bar.setStyleSheet("QProgressBar::chunk {background-color: #05B8CC;}")
 
         # Performance Indicators Group
         performance_group = QGroupBox("Performance Indicators")
         performance_layout = QHBoxLayout()
 
-        self.score_label = QLabel("Visuospatial Processing Score: 0")
-        self.score_label.setStyleSheet("font-size: 24px; font-weight: bold; color: blue;")
+        self.score_label = QLabel("Visuospatial Processing Score: 0 - N/A")
+        self.score_label.setStyleSheet("font-size: 24px; font-weight: bold; color: gray;")
         self.score_label.setAlignment(Qt.AlignCenter)
 
         performance_layout.addWidget(self.score_label)
@@ -208,6 +301,7 @@ class ClientWindow(QMainWindow):
         self.export_button.setStyleSheet("font-size: 14px; padding: 8px;")
         self.export_button.clicked.connect(self.export_results)
         self.export_button.setEnabled(False)
+        self.export_button.setToolTip("Click to export test results as a CSV file.")
 
         # Assemble Main Layout
         main_layout.addWidget(title_label)
@@ -224,54 +318,62 @@ class ClientWindow(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
+    def init_data_acquisition(self, board_id, params):
+        print("[ClientWindow] Initializing data acquisition thread.")
+        self.data_thread = DataAcquisitionThread(board_id=board_id, params=params)
+        self.data_thread.eeg_data_signal.connect(self.update_eeg_data)
+        self.data_thread.start()
+        self.status_label.setText("Connection Status: EEG Connected")
+        self.status_label.setStyleSheet("font-weight: bold; color: green;")
+
+    def init_maze_data_receiver(self, host, port):
+        print("[ClientWindow] Initializing maze data receiver thread.")
+        self.maze_thread = MazeDataReceiverThread(host=host, port=port)
+        self.maze_thread.maze_data_signal.connect(self.process_maze_data)
+        self.maze_thread.start()
+
+    @Slot(list)
+    def update_eeg_data(self, eeg_data):
+        # Update the EEG data queues
+        for i in range(self.eeg_channels):
+            self.eeg_data[i].append(eeg_data[i])
+
+        # Update the EEG graphs
+        for i, curve in enumerate(self.curves):
+            curve.setData(list(self.eeg_data[i]))
+
+        # Update the visuospatial processing score
+        # Replace this with your actual scoring logic
+        eeg_sum = sum(abs(val) for val in eeg_data)
+        self.score = min(int(eeg_sum), 100)  # Clamp score to 100
+        self.score_label.setText(f"Visuospatial Processing Score: {self.score} - N/A")
+        print(f"[ClientWindow] Updated Score: {self.score}")
+
+    @Slot(dict)
+    def process_maze_data(self, maze_data):
+        # Handle maze data received from the maze application
+        # Example data structure:
+        # {
+        #     'event': 'landmark_interaction',
+        #     'landmark_type': 'T_intersection',
+        #     'timestamp': 123.45
+        # }
+        print(f"[ClientWindow] Processing maze data: {maze_data}")
+        event = maze_data.get('event', '')
+        if event == 'landmark_interaction':
+            landmark_type = maze_data.get('landmark_type', 'Unknown')
+            timestamp = maze_data.get('timestamp', 0)
+            # You can expand this to handle different types of events
+            # For example, log the interaction or update the UI
+            print(f"[ClientWindow] Landmark Interaction at {timestamp}s: {landmark_type}")
+            # Potentially update the score based on interactions
+
     def update_test_duration(self, value):
         print(f"[ClientWindow] Test duration updated to {value} seconds.")
         self.test_duration = value
         if not self.test_running:
             self.progress_bar.setMaximum(self.test_duration)
-            self.progress_bar.setFormat(f"Test Progress: 0/{self.test_duration} seconds")
-
-    def draw_grid(self):
-        # Navigation grid has been removed as per requirements
-        pass
-
-    def init_socket(self, host, port):
-        print(f"[ClientWindow] Initializing socket connection to {host}:{port}.")
-        self.receiver_thread = ReceiverThread(host, port)
-        self.receiver_thread.data_received.connect(self.signal_handler.data_received)
-        self.receiver_thread.connection_status.connect(self.signal_handler.connection_status)
-        self.receiver_thread.start()
-
-    @Slot(str)
-    def update_status(self, status):
-        print(f"[ClientWindow] Connection status updated: {status}")
-        self.status_label.setText(f"Connection Status: {status}")
-        if status.startswith("Connected"):
-            self.status_label.setStyleSheet("font-weight: bold; color: green;")
-        else:
-            self.status_label.setStyleSheet("font-weight: bold; color: red;")
-
-    @Slot(dict)
-    def process_data(self, data):
-        print(f"[ClientWindow] Processing data: {data}")
-        eeg = data.get('eeg', [])
-        timestamp = data.get('timestamp', 0)
-
-        # Update EEG data
-        for i in range(min(self.eeg_channels, len(eeg))):
-            self.eeg_data[i].append(eeg[i])
-
-        # Update EEG Graph
-        for i, curve in enumerate(self.curves):
-            curve.setData(list(self.eeg_data[i]))
-
-        # Update Score (Dummy Calculation based on EEG data sum)
-        if self.test_running and not self.test_paused:
-            # Example: Sum of absolute EEG values as a simple score
-            eeg_sum = sum(abs(val) for val in eeg[:self.eeg_channels])
-            self.score = min(eeg_sum, 100)  # Clamp score to 100
-            self.score_label.setText(f"Visuospatial Processing Score: {self.score}")
-            print(f"[ClientWindow] Updated Score: {self.score}")
+            self.progress_bar.setFormat(f"Test Progress: 0/{self.test_duration}/s")
 
     def start_test(self):
         print("[ClientWindow] Start Test button clicked.")
@@ -294,7 +396,7 @@ class ClientWindow(QMainWindow):
         self.test_duration = self.duration_input.value()
         self.progress_bar.setMaximum(self.test_duration)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat(f"Test Progress: 0/{self.test_duration} seconds")
+        self.progress_bar.setFormat(f"Test Progress: 0/{self.test_duration}/s")
         print(f"[ClientWindow] Test duration set to {self.test_duration} seconds.")
 
         # Initialize Test Variables
@@ -304,7 +406,8 @@ class ClientWindow(QMainWindow):
         self.elapsed_time = 0
         self.pass_fail_result = None
         self.score = 0
-        self.score_label.setText("Visuospatial Processing Score: 0")
+        self.score_label.setText("Visuospatial Processing Score: 0 - N/A")
+        self.score_label.setStyleSheet("font-size: 24px; font-weight: bold; color: gray;")
         self.eeg_graph.clear()  # Clear existing EEG plots
         for i in range(self.eeg_channels):
             self.curves[i] = self.eeg_graph.plot(pen=pg.mkPen(self.colors[i], width=1), name=f"Channel {i+1}")
@@ -363,7 +466,7 @@ class ClientWindow(QMainWindow):
             color = "red"
 
         # Update Score Label to Highlight Pass/Fail
-        self.score_label.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {color};")
+        self.score_label.setStyleSheet(f"font-size: 28px; font-weight: bold; color: {color};")
         self.score_label.setText(f"Visuospatial Processing Score: {self.score} - {self.pass_fail_result}")
 
         # Enable Export Button
@@ -381,10 +484,9 @@ class ClientWindow(QMainWindow):
 
         self.pass_fail_result = None
         self.score = 0
-        self.score_label.setText("Visuospatial Processing Score: 0")
-        self.score_label.setStyleSheet("font-size: 24px; font-weight: bold; color: blue;")
+        self.score_label.setText("Visuospatial Processing Score: 0 - N/A")
+        self.score_label.setStyleSheet("font-size: 24px; font-weight: bold; color: gray;")
         self.progress_bar.setValue(0)
-        self.nav_text.clear()
         self.eeg_graph.clear()
         for i in range(self.eeg_channels):
             self.curves[i] = self.eeg_graph.plot(pen=pg.mkPen(self.colors[i], width=1), name=f"Channel {i+1}")
@@ -415,13 +517,15 @@ class ClientWindow(QMainWindow):
                         "Patient Name",
                         "Age",
                         "Result",
-                        "Visuospatial Processing Score"
+                        "Visuospatial Processing Score",
+                        "Timestamp"
                     ])
                     writer.writerow([
                         self.name_input.text().strip(),
                         self.age_input.text().strip(),
                         self.pass_fail_result,
-                        self.score
+                        self.score,
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     ])
                 QMessageBox.information(self, "Export Successful", f"Results exported to {file_path}")
                 print(f"[ClientWindow] Results exported to {file_path}")
@@ -432,6 +536,7 @@ class ClientWindow(QMainWindow):
     def monitor_test(self):
         self.elapsed_time += 1
         self.progress_bar.setValue(self.elapsed_time)
+        self.progress_bar.setFormat(f"Test Progress: {self.elapsed_time}/{self.test_duration}/s")
         print(f"[ClientWindow] Test progress: {self.elapsed_time}/{self.test_duration} seconds.")
 
         if self.elapsed_time >= self.test_duration:
@@ -458,7 +563,7 @@ class ClientWindow(QMainWindow):
             color = "red"
 
         # Update Score Label to Highlight Pass/Fail
-        self.score_label.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {color};")
+        self.score_label.setStyleSheet(f"font-size: 28px; font-weight: bold; color: {color};")
         self.score_label.setText(f"Visuospatial Processing Score: {self.score} - {self.pass_fail_result}")
 
         # Enable Export Button
@@ -471,14 +576,28 @@ class ClientWindow(QMainWindow):
 
     def closeEvent(self, event):
         print("[ClientWindow] Closing application.")
-        if hasattr(self, 'receiver_thread'):
-            self.receiver_thread.stop()
+        if hasattr(self, 'data_thread'):
+            self.data_thread.stop()
+        if hasattr(self, 'maze_thread'):
+            self.maze_thread.stop()
         event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    server_ip = 'localhost'  # Change this to the server's IP address if on a different machine
-    server_port = 12345
-    client = ClientWindow(server_ip, server_port)
+
+    # Define BrainFlow input parameters
+    params = BrainFlowInputParams()
+    params.serial_port = '/dev/cu.usbmodem11'  # Update this to your actual serial port
+
+    # Choose the appropriate board ID
+    # For example, BoardIds.CYTON_BOARD for Cyton boards
+    # Refer to BrainFlow documentation for supported board IDs
+    board_id = BoardIds.SYNTHETIC_BOARD  # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
+
+    # Define Maze Server Parameters
+    maze_host = 'localhost'  # The UI will listen on this host
+    maze_port = 65432         # The UI will listen on this port
+
+    client = ClientWindow(board_id=board_id, params=params, maze_host=maze_host, maze_port=maze_port)
     client.show()
     sys.exit(app.exec())
