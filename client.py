@@ -5,6 +5,7 @@ import csv
 import socket
 from datetime import datetime
 from collections import deque
+import numpy as np
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget,
@@ -19,7 +20,7 @@ from brainflow import DataFilter
 
 # Define the DataAcquisitionThread to handle BrainFlow data
 class DataAcquisitionThread(QThread):
-    eeg_data_signal = Signal(list)  # Emit EEG data list
+    eeg_data_signal = Signal(np.ndarray)  # Emit EEG data list
 
     def __init__(self, board_id=BoardIds.SYNTHETIC_BOARD, params=None):
         super().__init__()
@@ -42,8 +43,7 @@ class DataAcquisitionThread(QThread):
                 if data.size > 0:
                     # Assuming the first row contains the latest data for channel 1
                     # Adjust indexing based on your specific board and channel setup
-                    latest_eeg = data[:, :8].tolist()  # Get first 8 channels
-                    latest_eeg = [row[-1] for row in latest_eeg]  # Latest sample for each channel
+                    latest_eeg = data[:4]  # Get first 8 channels
                     self.eeg_data_signal.emit(latest_eeg)
                 time.sleep(0.5)  # Adjust the sleep time as needed
 
@@ -173,7 +173,10 @@ class ClientWindow(QMainWindow):
 
         # Initialize Data Structures
         self.eeg_channels = 4
-        self.eeg_data = [deque(maxlen=100) for _ in range(self.eeg_channels)]
+        self.board_id = board_id
+        graph_window_seconds = 5
+        buffer_size = graph_window_seconds * BoardShim.get_sampling_rate(self.board_id)
+        self.eeg_data = np.zeros((self.eeg_channels, buffer_size))
         self.maze_events = []  # Store maze events for potential future use
 
         # Initialize UI
@@ -336,7 +339,8 @@ class ClientWindow(QMainWindow):
     def update_eeg_data(self, eeg_data):
         # Update the EEG data queues
         for i in range(self.eeg_channels):
-            self.eeg_data[i].append(eeg_data[i])
+            self.eeg_data[i] = np.roll(self.eeg_data[i], -len(eeg_data[i]), 0)
+            self.eeg_data[i, -len(eeg_data[i]):] = eeg_data[i]
 
         # Update the EEG graphs
         for i, curve in enumerate(self.curves):
