@@ -25,6 +25,7 @@ class DataAcquisitionThread(QThread):
     def __init__(self, board_id=BoardIds.SYNTHETIC_BOARD, params=None):
         super().__init__()
         self.board_id = board_id
+
         self.params = params if params else BrainFlowInputParams()
         self.board = None
         self.is_running = True
@@ -224,6 +225,7 @@ class ClientWindow(QMainWindow):
         eeg_group = QGroupBox("EEG Data")
         eeg_layout = QVBoxLayout()
         self.eeg_graph = pg.PlotWidget(title="Real-Time EEG Data")
+        self.eeg_graph.setMouseEnabled(x=False, y=False)
         self.eeg_graph.setYRange(-150, 150)
         self.eeg_graph.showGrid(x=True, y=True)
         self.eeg_graph.addLegend()
@@ -596,7 +598,8 @@ if __name__ == "__main__":
     # Choose the appropriate board ID
     # For example, BoardIds.CYTON_BOARD for Cyton boards
     # Refer to BrainFlow documentation for supported board IDs
-    board_id = BoardIds.SYNTHETIC_BOARD  # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
+    board_id = BoardIds.GANGLION_BOARD  # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
+    
 
     # Define Maze Server Parameters
     maze_host = 'localhost'  # The UI will listen on this host
