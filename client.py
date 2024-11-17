@@ -19,7 +19,7 @@ from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow import DataFilter
 from brainflow.data_filter import DetrendOperations, FilterTypes, NoiseTypes
 
-TESTING = True
+TESTING = False
 # Define the DataAcquisitionThread to handle BrainFlow data
 class DataAcquisitionThread(QThread):
     eeg_data_signal = Signal(tuple)  # Emit EEG data list
