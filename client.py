@@ -29,6 +29,7 @@ class DataAcquisitionThread(QThread):
         self.params = params if params else BrainFlowInputParams()
         self.board = None
         self.is_running = True
+        self.eeg_channels = BoardShim.get_eeg_channels(board_id)
 
     def run(self):
         try:
@@ -37,16 +38,19 @@ class DataAcquisitionThread(QThread):
             self.board.prepare_session()
             self.board.start_stream()
             print("[DataAcquisitionThread] Board session started.")
-
+            
             while self.is_running:
                 # Get data from the board
                 data = self.board.get_board_data()
                 if data.size > 0:
                     # Assuming the first row contains the latest data for channel 1
                     # Adjust indexing based on your specific board and channel setup
-                    latest_eeg = data[:4]  # Get first 8 channels
+                    latest_eeg = data[self.eeg_channels]
                     self.eeg_data_signal.emit(latest_eeg)
-                time.sleep(0.5)  # Adjust the sleep time as needed
+
+                    # Save data to a file
+                    DataFilter.write_file(data, 'eeg_data.csv', 'a')
+                time.sleep(0.05)  # Adjust the sleep time as needed
 
         except Exception as e:
             print(f"[DataAcquisitionThread] Exception: {e}")
@@ -226,9 +230,10 @@ class ClientWindow(QMainWindow):
         eeg_layout = QVBoxLayout()
         self.eeg_graph = pg.PlotWidget(title="Real-Time EEG Data")
         self.eeg_graph.setMouseEnabled(x=False, y=False)
-        self.eeg_graph.setYRange(-150, 150)
+        # self.eeg_graph.setYRange(-150, 150)
         self.eeg_graph.showGrid(x=True, y=True)
         self.eeg_graph.addLegend()
+        self.eeg_graph.hideAxis("bottom")
 
         self.curves = []
         self.colors = ['r', 'g', 'b', 'c', 'm', 'y', 'w', 'k']
@@ -350,10 +355,10 @@ class ClientWindow(QMainWindow):
 
         # Update the visuospatial processing score
         # Replace this with your actual scoring logic
-        eeg_sum = sum(abs(val) for val in eeg_data)
-        self.score = min(int(eeg_sum), 100)  # Clamp score to 100
-        self.score_label.setText(f"Visuospatial Processing Score: {self.score} - N/A")
-        print(f"[ClientWindow] Updated Score: {self.score}")
+        # eeg_sum = sum(abs(val) for val in eeg_data)
+        # self.score = min(int(eeg_sum), 100)  # Clamp score to 100
+        # self.score_label.setText(f"Visuospatial Processing Score: {self.score} - N/A")
+        # print(f"[ClientWindow] Updated Score: {self.score}")
 
     @Slot(dict)
     def process_maze_data(self, maze_data):
@@ -600,7 +605,6 @@ if __name__ == "__main__":
     # Refer to BrainFlow documentation for supported board IDs
     board_id = BoardIds.GANGLION_BOARD  # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
     
-
     # Define Maze Server Parameters
     maze_host = 'localhost'  # The UI will listen on this host
     maze_port = 65432         # The UI will listen on this port
