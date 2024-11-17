@@ -26,6 +26,7 @@ class ClientHandler(QThread):
         start_time = time.time()
         while self.is_running:
             elapsed = time.time() - start_time
+
             # Simulate EEG data as sinusoidal waves with noise
             eeg = [math.sin(2 * math.pi * 0.5 * elapsed + i) * 50 + random.uniform(-10, 10) for i in range(8)]
             
@@ -45,12 +46,38 @@ class ClientHandler(QThread):
                 }
             }
             message = json.dumps(data)
+
+            # Send EEG data to the client
             try:
                 self.client_socket.sendall(message.encode('utf-8') + b'\n')
                 self.message_sent.emit(message)
             except BrokenPipeError:
                 print(f"Client {self.address} disconnected")
                 break
+# ---------------------------------------------------------------------------------- 
+            # NEW: Check for incoming data (e.g., triggers from Unity)
+            try:
+                incoming_data = self.client_socket.recv(1024).decode('utf-8').strip()
+                if incoming_data:
+                    print(f"[Server] Received trigger: {incoming_data}")
+                    self.message_sent.emit(f"[Server] Received trigger: {incoming_data}")
+                    #draw line in data
+                    try:
+                        # Parse as JSON if applicable
+                        json_data = json.loads(incoming_data)
+                        print(f"[Server] Parsed trigger JSON: {json_data}")
+                        self.message_sent.emit(f"[Server] Parsed trigger JSON: {json_data}")
+                    except json.JSONDecodeError:
+                        print(f"[Server] Invalid JSON received: {incoming_data}")
+                        self.message_sent.emit(f"[Server] Invalid JSON received: {incoming_data}")
+            except socket.timeout:
+                # Continue if no data is received within the timeout
+                pass
+            except ConnectionResetError:
+                print(f"[Server] Connection reset by Unity client at {self.address}")
+                break
+
+# -----------------------------------------------------------------------------------
             time.sleep(1)  # Send data every second
 
     def stop(self):
@@ -79,6 +106,7 @@ class ServerThread(QThread):
             while self.is_running:
                 try:
                     client_socket, addr = server_socket.accept()
+                    print(f"[ServerThread] Client connected: {addr}")  # Debugging log
                     handler = ClientHandler(client_socket, addr, self.model)
                     handler.message_sent.connect(self.message_sent.emit)
                     handler.start()

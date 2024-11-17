@@ -19,7 +19,7 @@ pip install -r requirements.txt
 ```
 
 [x] Theta bars across entire session
-[] Theta bars across arbitrary epochs
+[x] Theta bars across arbitrary epochs
 [] All bands ss comparison
 [] Acqure data from team to put on presentation to show robust
 [] unfiltered comparison vs theta time series
