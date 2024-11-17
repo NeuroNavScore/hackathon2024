@@ -1,0 +1,452 @@
+{
+  "app_key": "application.generated.unity.nbsl.exe",
+  "bindings": {
+    "/actions/buggy": {
+      "chords": [],
+      "poses": [],
+      "haptics": [],
+      "sources": [
+        {
+          "path": "/user/hand/left/input/trigger",
+          "mode": "trigger",
+          "parameters": {},
+          "inputs": {
+            "pull": {
+              "output": "/actions/buggy/in/throttle"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trigger",
+          "mode": "trigger",
+          "parameters": {},
+          "inputs": {
+            "pull": {
+              "output": "/actions/buggy/in/throttle"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trackpad",
+          "mode": "trackpad",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/buggy/in/brake"
+            },
+            "position": {
+              "output": "/actions/buggy/in/steering"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trackpad",
+          "mode": "trackpad",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/buggy/in/brake"
+            },
+            "position": {
+              "output": "/actions/buggy/in/steering"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/application_menu",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/buggy/in/reset"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/application_menu",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/buggy/in/reset"
+            }
+          }
+        }
+      ],
+      "skeleton": []
+    },
+    "/actions/default": {
+      "chords": [],
+      "poses": [
+        {
+          "output": "/actions/default/in/pose",
+          "path": "/user/hand/left/pose/raw"
+        },
+        {
+          "output": "/actions/default/in/pose",
+          "path": "/user/hand/right/pose/raw"
+        }
+      ],
+      "haptics": [
+        {
+          "output": "/actions/default/out/haptic",
+          "path": "/user/hand/left/output/haptic"
+        },
+        {
+          "output": "/actions/default/out/haptic",
+          "path": "/user/hand/right/output/haptic"
+        }
+      ],
+      "sources": [
+        {
+          "path": "/user/hand/left/input/trigger",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/grabpinch"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/grip",
+          "mode": "button",
+          "parameters": {
+            "click_activate_threshold": "0.05",
+            "click_deactivate_threshold": "0",
+            "force_input": "force"
+          },
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/grabgrip"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trigger",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/grabpinch"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trackpad",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/teleport"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trackpad",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/teleport"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/grip",
+          "mode": "button",
+          "parameters": {
+            "click_activate_threshold": "0.05",
+            "click_deactivate_threshold": "0",
+            "force_input": "force"
+          },
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/grabgrip"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trigger",
+          "mode": "trigger",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/grabpinch"
+            },
+            "pull": {
+              "output": "/actions/default/in/squeeze"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trigger",
+          "mode": "trigger",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/grabpinch"
+            },
+            "pull": {
+              "output": "/actions/default/in/squeeze"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/application_menu",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/interactui"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/application_menu",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/default/in/interactui"
+            }
+          }
+        }
+      ],
+      "skeleton": [
+        {
+          "output": "/actions/default/in/skeletonlefthand",
+          "path": "/user/hand/left/input/skeleton/left"
+        },
+        {
+          "output": "/actions/default/in/skeletonrighthand",
+          "path": "/user/hand/right/input/skeleton/right"
+        }
+      ]
+    },
+    "/actions/landmarks": {
+      "chords": [],
+      "poses": [
+        {
+          "output": "/actions/landmarks/in/pose",
+          "path": "/user/hand/left/pose/raw"
+        },
+        {
+          "output": "/actions/landmarks/in/pose",
+          "path": "/user/hand/right/pose/raw"
+        }
+      ],
+      "haptics": [
+        {
+          "output": "/actions/landmarks/out/haptic",
+          "path": "/user/hand/left/output/haptic"
+        },
+        {
+          "output": "/actions/landmarks/out/haptic",
+          "path": "/user/hand/right/output/haptic"
+        }
+      ],
+      "sources": [
+        {
+          "path": "/user/hand/left/input/grip",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/gripbutton"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/grip",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/gripbutton"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/grip",
+          "mode": "scalar_constant",
+          "parameters": {},
+          "inputs": {
+            "value": {
+              "output": "/actions/landmarks/in/gripsqueeze"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/grip",
+          "mode": "scalar_constant",
+          "parameters": {},
+          "inputs": {
+            "value": {
+              "output": "/actions/landmarks/in/gripsqueeze"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/application_menu",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/upperbutton"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/application_menu",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/upperbutton"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trigger",
+          "mode": "trigger",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/triggerbutton"
+            },
+            "pull": {
+              "output": "/actions/landmarks/in/triggersqueeze"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trigger",
+          "mode": "trigger",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/triggerbutton"
+            },
+            "pull": {
+              "output": "/actions/landmarks/in/triggersqueeze"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trigger",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/triggerbutton"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trigger",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/triggerbutton"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trackpad",
+          "mode": "trackpad",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/touchpadbutton"
+            },
+            "position": {
+              "output": "/actions/landmarks/in/touchpadposition"
+            },
+            "touch": {
+              "output": "/actions/landmarks/in/touchpadtouch"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trackpad",
+          "mode": "trackpad",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/landmarks/in/touchpadbutton"
+            },
+            "position": {
+              "output": "/actions/landmarks/in/touchpadposition"
+            },
+            "touch": {
+              "output": "/actions/landmarks/in/touchpadtouch"
+            }
+          }
+        }
+      ],
+      "skeleton": [
+        {
+          "output": "/actions/landmarks/in/skeletonrighthand",
+          "path": "/user/hand/left/input/skeleton/right"
+        },
+        {
+          "output": "/actions/landmarks/in/skeletonrighthand",
+          "path": "/user/hand/right/input/skeleton/right"
+        }
+      ]
+    },
+    "/actions/platformer": {
+      "chords": [],
+      "poses": [],
+      "haptics": [],
+      "sources": [
+        {
+          "path": "/user/hand/left/input/trackpad",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/platformer/in/jump"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trackpad",
+          "mode": "button",
+          "parameters": {},
+          "inputs": {
+            "click": {
+              "output": "/actions/platformer/in/jump"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trackpad",
+          "mode": "trackpad",
+          "parameters": {},
+          "inputs": {
+            "position": {
+              "output": "/actions/platformer/in/move"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trackpad",
+          "mode": "trackpad",
+          "parameters": {},
+          "inputs": {
+            "position": {
+              "output": "/actions/platformer/in/move"
+            }
+          }
+        }
+      ],
+      "skeleton": []
+    }
+  },
+  "controller_type": "vive_controller",
+  "description": "",
+  "name": "Landmarks Vive Bindings"
+}
