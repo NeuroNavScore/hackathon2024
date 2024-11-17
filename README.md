@@ -17,6 +17,10 @@ conda install -c conda-forge mne-lsl
 ```
 pip install -r requirements.txt
 ```
+run landmarks.exe before running the client:
+```
+python client.py
+```
 
 [x] Theta bars across entire session
 [x] Theta bars across arbitrary epochs
