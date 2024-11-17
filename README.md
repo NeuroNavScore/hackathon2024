@@ -17,7 +17,7 @@ conda install -c conda-forge mne-lsl
 ```
 pip install -r requirements.txt
 ```
-Run landmarks.exe
+run landmarks.exe before running the client:
 ```
 python client.py
 ```
