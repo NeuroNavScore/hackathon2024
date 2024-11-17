@@ -95,7 +95,7 @@ class MazeDataReceiverThread(QThread):
             self.server_socket.listen(1)
             self.server_socket.settimeout(1.0)  # Timeout for accepting connections
             print(f"[MazeDataReceiverThread] Server listening on {self.host}:{self.port}")
-
+    
             while self.is_running:
                 try:
                     self.client_socket, addr = self.server_socket.accept()
@@ -116,14 +116,16 @@ class MazeDataReceiverThread(QThread):
                         if not data:
                             print("[MazeDataReceiverThread] Client disconnected.")
                             break
-                        messages = data.strip().split('\n')
-                        for message in messages:
-                            try:
-                                json_data = json.loads(message)
-                                self.maze_data_signal.emit(json_data)
-                                print(f"[MazeDataReceiverThread] Received data: {json_data}")
-                            except json.JSONDecodeError:
-                                print("[MazeDataReceiverThread] Received malformed JSON.")
+                        
+                        #draw line in data
+                        try:
+                            # Parse as JSON if applicable
+                            json_data = json.loads(data)
+                            print(f"[MazeDataReceiverThread] Parsed trigger JSON: {json_data}")
+                            print(type(json_data))  # should be a dictionary
+                            self.maze_data_signal.emit(json_data)
+                        except json.JSONDecodeError:
+                            print("[MazeDataReceiverThread] Received malformed JSON.")
                     except socket.timeout:
                         continue  # Check if still running
                     except ConnectionResetError:
@@ -384,10 +386,7 @@ class ClientWindow(QMainWindow):
         if event == 'landmark_interaction':
             landmark_type = maze_data.get('landmark_type', 'Unknown')
             timestamp = maze_data.get('timestamp', 0)
-            # You can expand this to handle different types of events
-            # For example, log the interaction or update the UI
             print(f"[ClientWindow] Landmark Interaction at {timestamp}s: {landmark_type}")
-            # Potentially update the score based on interactions
 
     def update_test_duration(self, value):
         print(f"[ClientWindow] Test duration updated to {value} seconds.")
