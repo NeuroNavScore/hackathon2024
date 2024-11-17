@@ -38,7 +38,8 @@ class DataAcquisitionThread(QThread):
             self.board.prepare_session()
             self.board.start_stream()
             print("[DataAcquisitionThread] Board session started.")
-            
+
+            counter = 0  # temp
             while self.is_running:
                 # Get data from the board
                 data = self.board.get_board_data()
@@ -50,6 +51,14 @@ class DataAcquisitionThread(QThread):
 
                     # Save data to a file
                     DataFilter.write_file(data, 'eeg_data.csv', 'a')
+                if counter % 100 == 0:
+                    self.board.insert_marker(1)  # temp
+                    print(f"Inserting {counter}")
+                    counter = 0
+                elif counter % 50 == 0:
+                    self.board.insert_marker(2)  # temp
+                    print(f"Inserting {counter}")
+                counter += 1
                 time.sleep(0.05)  # Adjust the sleep time as needed
 
         except Exception as e:
@@ -159,6 +168,7 @@ class MazeDataReceiverThread(QThread):
         self.quit()
         self.wait()
         print("[MazeDataReceiverThread] Thread stopped.")
+
 # Define the main ClientWindow
 class ClientWindow(QMainWindow):
     def __init__(self, board_id=BoardIds.SYNTHETIC_BOARD, params=None, maze_host='localhost', maze_port=65432):
