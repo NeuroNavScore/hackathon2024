@@ -16,7 +16,7 @@ class Results(QMainWindow):
         layout = QVBoxLayout()
 
         # Create a plot widget
-        self.plotWidget = pg.PlotWidget(title="Theta Activity")
+        self.plotWidget = pg.PlotWidget(title="Theta Activity", background=None)
         layout.addWidget(self.plotWidget)
 
         # Sample data for the bar graph
