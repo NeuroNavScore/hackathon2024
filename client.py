@@ -79,7 +79,7 @@ class DataAcquisitionThread(QThread):
 class MazeDataReceiverThread(QThread):
     maze_data_signal = Signal(dict)  # Emit maze data as a dictionary
 
-    def __init__(self, host='localhost', port=65432):
+    def __init__(self, host='0.0.0.0', port=12345):
         super().__init__()
         self.host = host
         self.port = port
@@ -92,7 +92,7 @@ class MazeDataReceiverThread(QThread):
             # Set up the server socket
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.bind((self.host, self.port))
-            self.server_socket.listen(1)
+            self.server_socket.listen(5)
             self.server_socket.settimeout(1.0)  # Timeout for accepting connections
             print(f"[MazeDataReceiverThread] Server listening on {self.host}:{self.port}")
     
@@ -612,11 +612,11 @@ if __name__ == "__main__":
     # Choose the appropriate board ID
     # For example, BoardIds.CYTON_BOARD for Cyton boards
     # Refer to BrainFlow documentation for supported board IDs
-    board_id = BoardIds.GANGLION_BOARD  # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
+    board_id = BoardIds.SYNTHETIC_BOARD # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
     
     # Define Maze Server Parameters
-    maze_host = 'localhost'  # The UI will listen on this host
-    maze_port = 65432         # The UI will listen on this port
+    maze_host = '0.0.0.0'  # The UI will listen on this host
+    maze_port = 12345         # The UI will listen on this port
 
     client = ClientWindow(board_id=board_id, params=params, maze_host=maze_host, maze_port=maze_port)
     client.show()
