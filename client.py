@@ -17,8 +17,9 @@ import pyqtgraph as pg
 
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow import DataFilter
+from brainflow.data_filter import DetrendOperations, FilterTypes, NoiseTypes
 
-TESTING = False
+TESTING = True
 # Define the DataAcquisitionThread to handle BrainFlow data
 class DataAcquisitionThread(QThread):
     eeg_data_signal = Signal(tuple)  # Emit EEG data list
@@ -191,7 +192,7 @@ class ClientWindow(QMainWindow):
         self.eeg_channels = 4
         self.board_id = board_id
         graph_window_seconds = 5
-        buffer_size = graph_window_seconds * BoardShim.get_sampling_rate(self.board_id)
+        buffer_size = graph_window_seconds * BoardShim.get_sampling_rate(self.board_id) + 200
         self.eeg_data = np.zeros((self.eeg_channels, buffer_size))
         self.t = np.zeros(buffer_size)
         self.ticks = {}
@@ -365,13 +366,18 @@ class ClientWindow(QMainWindow):
             self.eeg_data[i] = np.roll(self.eeg_data[i], -len(eeg_data[i]), 0)
             self.eeg_data[i, -len(eeg_data[i]):] = eeg_data[i]
 
+        sr = BoardShim.get_sampling_rate(self.board_id)
         # Update the EEG graphs
         for i, curve in enumerate(self.curves):
-            curve.setData(x=self.t, y=self.eeg_data[i])
+            data = self.eeg_data[i].copy()
+            # DataFilter.remove_environmental_noise(data, sr, NoiseTypes.SIXTY.value)
+            # DataFilter.detrend(data, DetrendOperations.CONSTANT.value)
+            # DataFilter.perform_bandpass(data, sr, 4, 8, 4, FilterTypes.BUTTERWORTH, 0)
+            curve.setData(x=self.t[200:], y=data[200:])
         
         # Update the ticks
         for tick in self.ticks.keys():
-            if tick < self.t[0] and self.ticks[tick] is not None:
+            if tick < self.t[200] and self.ticks[tick] is not None:
                 self.eeg_graph.removeItem(self.ticks[tick])  # delete the inf line
             if tick <= self.t[-1] and self.ticks[tick] is None:
                 self.ticks[tick] = self.eeg_graph.addLine(x=tick, pen=pg.mkPen('r', width=5))
@@ -625,7 +631,7 @@ if __name__ == "__main__":
     # Choose the appropriate board ID
     # For example, BoardIds.CYTON_BOARD for Cyton boards
     # Refer to BrainFlow documentation for supported board IDs
-    board_id = BoardIds.SYNTHETIC_BOARD # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
+    board_id = BoardIds.GANGLION_BOARD # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
     
     # Define Maze Server Parameters
     maze_host = '0.0.0.0'  # The UI will listen on this host
