@@ -631,7 +631,7 @@ if __name__ == "__main__":
     # Choose the appropriate board ID
     # For example, BoardIds.CYTON_BOARD for Cyton boards
     # Refer to BrainFlow documentation for supported board IDs
-    board_id = BoardIds.GANGLION_BOARD # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
+    board_id = BoardIds.SYNTHETIC_BOARD # Replace with your actual board ID, e.g., BoardIds.CYTON_BOARD
     
     # Define Maze Server Parameters
     maze_host = '0.0.0.0'  # The UI will listen on this host
