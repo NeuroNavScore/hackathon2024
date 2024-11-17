@@ -20,14 +20,14 @@ class Results(QMainWindow):
         layout.addWidget(self.plotWidget)
 
         # Sample data for the bar graph
-        x = [0, 1]
+        x = [0]
         y = self.calculate_theta()
 
         # Create a bar graph item
         barGraph = pg.BarGraphItem(x=x, height=y, width=0.6, brush='b')
         self.plotWidget.addItem(barGraph)
         ax = self.plotWidget.getAxis('bottom')
-        ax.setTicks([[(0, 'Easy'), (1, 'Hard')]])
+        ax.setTicks([[(0, 'Easy')]])
 
         container = QWidget()
         container.setLayout(layout)
@@ -52,13 +52,13 @@ class Results(QMainWindow):
         raw = mne.io.RawArray(channel_data, info)  # input is (n_channels, n_samples)
         tmin, tmax = -0.5, 1  # in seconds
         markers = data[BoardShim.get_marker_channel(board_id), :]  # (n_samples, )
-        theta = [0, 0]
+        theta = [0]
 
         # Easy event markers
         power = theta_power(raw, markers, 1, tmin, tmax)
         theta[0] = power
-        power = theta_power(raw, markers, 2, tmin, tmax)
-        theta[1] = power
+        # power = theta_power(raw, markers, 2, tmin, tmax)
+        # theta[1] = power
         return theta
 
 def theta_power(raw, markers, event_id, tmin, tmax):
@@ -67,7 +67,7 @@ def theta_power(raw, markers, event_id, tmin, tmax):
     event_labels = markers[easy_event_indices]
     events = np.concatenate([easy_event_indices, zeroes, event_labels], axis=1).astype(int)
     epochs = mne.Epochs(raw, events, {f"{event_id}": event_id}, tmin, tmax)
-    epochs.plot(n_epochs=2, n_channels=4, events=True, scalings="auto")
+    # epochs.plot(n_epochs=2, n_channels=4, events=True, scalings="auto")
 
     spectrum = epochs.compute_psd()
     psd, freqs = spectrum.get_data(return_freqs=True)
