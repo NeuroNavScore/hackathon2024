@@ -18,9 +18,10 @@ import pyqtgraph as pg
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow import DataFilter
 
+TESTING = True
 # Define the DataAcquisitionThread to handle BrainFlow data
 class DataAcquisitionThread(QThread):
-    eeg_data_signal = Signal(np.ndarray)  # Emit EEG data list
+    eeg_data_signal = Signal(tuple)  # Emit EEG data list
 
     def __init__(self, board_id=BoardIds.SYNTHETIC_BOARD, params=None):
         super().__init__()
@@ -39,7 +40,6 @@ class DataAcquisitionThread(QThread):
             self.board.start_stream()
             print("[DataAcquisitionThread] Board session started.")
 
-            counter = 0  # temp
             while self.is_running:
                 # Get data from the board
                 data = self.board.get_board_data()
@@ -47,18 +47,12 @@ class DataAcquisitionThread(QThread):
                     # Assuming the first row contains the latest data for channel 1
                     # Adjust indexing based on your specific board and channel setup
                     latest_eeg = data[self.eeg_channels]
-                    self.eeg_data_signal.emit(latest_eeg)
+                    t = data[BoardShim.get_timestamp_channel(self.board_id)]
+                    packet = (latest_eeg, t)
+                    self.eeg_data_signal.emit(packet)
 
                     # Save data to a file
                     DataFilter.write_file(data, 'eeg_data.csv', 'a')
-                if counter % 100 == 0:
-                    self.board.insert_marker(1)  # temp
-                    print(f"Inserting {counter}")
-                    counter = 0
-                elif counter % 50 == 0:
-                    self.board.insert_marker(2)  # temp
-                    print(f"Inserting {counter}")
-                counter += 1
                 time.sleep(0.05)  # Adjust the sleep time as needed
 
         except Exception as e:
@@ -88,6 +82,11 @@ class MazeDataReceiverThread(QThread):
         self.is_running = True
 
     def run(self):
+        if TESTING:
+            while True:
+                time.sleep(5)
+                data = {"triggerID": "T3"}
+                self.maze_data_signal.emit(data)
         try:
             # Set up the server socket
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -194,7 +193,8 @@ class ClientWindow(QMainWindow):
         graph_window_seconds = 5
         buffer_size = graph_window_seconds * BoardShim.get_sampling_rate(self.board_id)
         self.eeg_data = np.zeros((self.eeg_channels, buffer_size))
-        self.maze_events = []  # Store maze events for potential future use
+        self.t = np.zeros(buffer_size)
+        self.ticks = {}
 
         # Initialize UI
         self.init_ui()
@@ -240,7 +240,7 @@ class ClientWindow(QMainWindow):
         # EEG Data Visualization
         eeg_group = QGroupBox("EEG Data")
         eeg_layout = QVBoxLayout()
-        self.eeg_graph = pg.PlotWidget(title="Real-Time EEG Data")
+        self.eeg_graph = pg.PlotWidget()
         self.eeg_graph.setMouseEnabled(x=False, y=False)
         # self.eeg_graph.setYRange(-150, 150)
         self.eeg_graph.showGrid(x=True, y=True)
@@ -355,7 +355,11 @@ class ClientWindow(QMainWindow):
         self.maze_thread.start()
 
     @Slot(list)
-    def update_eeg_data(self, eeg_data):
+    def update_eeg_data(self, data):
+        eeg_data, t = data
+        # Update the t
+        self.t = np.roll(self.t, -len(t), 0)
+        self.t[-len(t):] = t
         # Update the EEG data queues
         for i in range(self.eeg_channels):
             self.eeg_data[i] = np.roll(self.eeg_data[i], -len(eeg_data[i]), 0)
@@ -363,8 +367,15 @@ class ClientWindow(QMainWindow):
 
         # Update the EEG graphs
         for i, curve in enumerate(self.curves):
-            curve.setData(list(self.eeg_data[i]))
-
+            curve.setData(x=self.t, y=self.eeg_data[i])
+        
+        # Update the ticks
+        for tick in self.ticks.keys():
+            if tick < self.t[0] and self.ticks[tick] is not None:
+                self.eeg_graph.removeItem(self.ticks[tick])  # delete the inf line
+            if tick <= self.t[-1] and self.ticks[tick] is None:
+                self.ticks[tick] = self.eeg_graph.addLine(x=tick, pen=pg.mkPen('r', width=5))
+                self.ticks[tick].setZValue(20)
         # Update the visuospatial processing score
         # Replace this with your actual scoring logic
         # eeg_sum = sum(abs(val) for val in eeg_data)
@@ -377,16 +388,18 @@ class ClientWindow(QMainWindow):
         # Handle maze data received from the maze application
         # Example data structure:
         # {
-        #     'event': 'landmark_interaction',
-        #     'landmark_type': 'T_intersection',
-        #     'timestamp': 123.45
+        #     'triggerID': 'T3',
         # }
         print(f"[ClientWindow] Processing maze data: {maze_data}")
-        event = maze_data.get('event', '')
-        if event == 'landmark_interaction':
-            landmark_type = maze_data.get('landmark_type', 'Unknown')
-            timestamp = maze_data.get('timestamp', 0)
-            print(f"[ClientWindow] Landmark Interaction at {timestamp}s: {landmark_type}")
+        event = maze_data.get('triggerID', '')
+        if event:
+            self.insert_marker()
+            tick = time.time()
+            self.ticks[tick] = None
+
+    def insert_marker(self, id=1):
+        if hasattr(self, 'data_thread'):
+            self.data_thread.board.insert_marker(id)
 
     def update_test_duration(self, value):
         print(f"[ClientWindow] Test duration updated to {value} seconds.")
