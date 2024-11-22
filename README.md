@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # hackathon2024
 
 ```
@@ -27,3 +28,8 @@ python client.py
 [] All bands ss comparison
 [] Acqure data from team to put on presentation to show robust
 [] unfiltered comparison vs theta time series
+=======
+#MAZE FOR SIMULATION TASK
+
+pip install -r requirements.txt
+>>>>>>> maze
